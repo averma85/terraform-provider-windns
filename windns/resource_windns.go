@@ -70,10 +70,14 @@ func resourceWinDNSRecordCreate(d *schema.ResourceData, m interface{}) error {
 				return errors.New("Must provide hostnamealias if record_type is 'CNAME'")
 			}
 			psCommand = "Add-DNSServerResourceRecord -ZoneName " + zone_name + " -" + record_type + " -Name " + record_name + " -HostNameAlias " + hostnamealias
+		case "PTR":
+			if ipv4address == "" {
+				return errors.New("Must provide ipv4address if record_type is 'PTR'")
+			}
+			psCommand = "Add-DnsServerResourceRecordPtr -ZoneName " + zone_name + " -PtrDomainName " + record_name + " -Name " + ipv4address
 		default:
-			return errors.New("Unknown record type. This provider currently only supports 'A' and 'CNAME' records.")
+			return errors.New("Unknown record type. This provider currently only supports 'A', 'CNAME', and 'PTR' records.")
 	}
-
         _, err := goPSRemoting.RunPowershellCommand(client.username, client.password, client.server, psCommand, client.usessl, client.usessh)
 	if err != nil {
 		//something bad happened
@@ -120,9 +124,31 @@ func resourceWinDNSRecordDelete(d *schema.ResourceData, m interface{}) error {
 	zone_name := d.Get("zone_name").(string)
 	record_type := d.Get("record_type").(string)
 	record_name := d.Get("record_name").(string)
+    ipv4address := d.Get("ipv4address").(string)
+    hostnamealias := d.Get("hostnamealias").(string)
 
-	//Remove-DnsServerResourceRecord -ZoneName "contoso.com" -RRType "A" -Name "Host01"
-	var psCommand string = "Remove-DNSServerResourceRecord -ZoneName " + zone_name + " -RRType " + record_type + " -Name " + record_name + " -Confirm:$false -Force"
+	var psCommand string
+
+	switch record_type {
+		case "A":
+			if ipv4address == "" {
+				return errors.New("Must provide ipv4address if record_type is 'A'")
+			}
+			psCommand = "Remove-DNSServerResourceRecord -ZoneName " + zone_name + " -RRType " + record_type + " -Name " + record_name + " -Confirm:$false -Force"
+		case "CNAME":
+			if hostnamealias == "" {
+				return errors.New("Must provide hostnamealias if record_type is 'CNAME'")
+			}
+			psCommand = "Remove-DNSServerResourceRecord -ZoneName " + zone_name + " -RRType " + record_type + " -Name " + record_name + " -Confirm:$false -Force"
+		case "PTR":
+			if ipv4address == "" {
+				return errors.New("Must provide ptr_name if record_type is 'PTR'")
+			}
+			psCommand = "Remove-DNSServerResourceRecord -ZoneName " + zone_name + " -RRType " + record_type + " -Name " + ipv4address + " -Confirm:$false -Force"
+			//Remove-DnsServerResourceRecord -ZoneName “25.168.192.in-addr.arpa” -RRType “PTR” -Name “100”
+		default:
+			return errors.New("Unknown record type. This provider currently only supports 'A', 'CNAME', and 'PTR' records.")
+	}
 
         _, err := goPSRemoting.RunPowershellCommand(client.username, client.password, client.server, psCommand, client.usessl, client.usessh)
 	if err != nil {
